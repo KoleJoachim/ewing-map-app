@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash import Dash, dcc, html, Input, Output
 import urllib.request
+import os
 
 # Load data
 final_df = pd.read_csv("final_df.csv")
@@ -81,5 +82,7 @@ def update_map(selected_chems):
     return fig
 
 # Run the app
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 8050))
+    app.run(host="0.0.0.0", port=port, debug=False)
