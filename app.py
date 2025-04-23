@@ -1,84 +1,92 @@
+import plotly.express as px
 import pandas as pd
 import json
-import plotly.express as px
-import plotly.graph_objects as go
-from dash import Dash, dcc, html, Input, Output
-import urllib.request
-import os
 
-# Load data
-final_df = pd.read_csv("final_df.csv")
+# STEP 1: Load GeoJSON
+with open("geojson-counties-fips.json") as f:
+    geojson_data = json.load(f)
+
+# STEP 2: Format FIPS codes
 final_df["FIPS"] = final_df["FIPS"].astype(str).str.zfill(5)
 
-# GeoJSON for counties
-with urllib.request.urlopen("https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json") as response:
-    counties_geojson = json.load(response)
-
-# Set up Dash app
-app = Dash(__name__)
-
-# Dropdown options and colors
-chem_options = {
-    "nickel_label": "Nickel",
-    "chromium_label": "Chromium",
-    "benzo[g,h,i]perylene_label": "Benzo[g,h,i]perylene"
+# STEP 3: Define pastel colors and correct column name mapping
+pastel_colors = {
+    "Xylene (Mixed Isomers)": "#a6cee3",     # pastel blue
+    "Ethylbenzene": "#fdbf6f",               # pastel orange
+    "Toluene": "#b2df8a",                    # pastel green
+    "Naphthalene": "#fb9a99",                # pastel red
+    "Nickel compounds": "#cab2d6",           # pastel purple
+    "Benzo[g,h,i]perylene": "#ffff99"        # pastel yellow
 }
 
-chem_colors = {
-    "nickel_label": "#636EFA",       # Blue
-    "chromium_label": "#EF553B",     # Red
-    "benzo[g,h,i]perylene_label": "#00CC96"  # Green
+# Explicit column mapping for label fields
+chemical_column_map = {
+    "Xylene (Mixed Isomers)": "xylene (mixed isomers)_label",
+    "Ethylbenzene": "ethylbenzene_label",
+    "Toluene": "toluene_label",
+    "Naphthalene": "naphthalene_label",
+    "Nickel compounds": "nickel compounds_label",
+    "Benzo[g,h,i]perylene": "benzo[g,h,i]perylene_label"
 }
 
-# Layout
-app.layout = html.Div([
-    html.H2("Ewing Sarcoma Incidence and Chemical Exposure Explorer"),
-    html.Label("Toggle high exposure overlays below:"),
-    dcc.Checklist(
-        id="chemical-checklist",
-        options=[{"label": name, "value": key} for key, name in chem_options.items()],
-        value=list(chem_options.keys()),
-        inline=True
-    ),
-    dcc.Graph(id="choropleth-map")
-])
-
-# Callback to update map
-@app.callback(
-    Output("choropleth-map", "figure"),
-    Input("chemical-checklist", "value")
-)
-def update_map(selected_chems):
-    # Base choropleth
-    fig = px.choropleth_mapbox(
-        final_df,
-        geojson=counties_geojson,
-        locations="FIPS",
-        color="Rate_per_1M",
-        color_continuous_scale="YlOrRd",
-        range_color=(0, final_df["Rate_per_1M"].max()),
-        mapbox_style="carto-positron",
-        zoom=3,
-        center={"lat": 37.8, "lon": -96},
-        opacity=0.6,
-        labels={"Rate_per_1M": "Ewing Rate per 1M"}
-    )
-
-    # Add overlays
-    for chem in selected_chems:
-        overlay = final_df[final_df[chem] == "High"]
-        fig.add_choroplethmapbox(
-            geojson=counties_geojson,
-            locations=overlay["FIPS"],
-            z=[1] * len(overlay),
-            colorscale=[[0, chem_colors[chem]], [1, chem_colors[chem]]],
-            showscale=False,
+# STEP 4: Generate overlay traces for each chemical
+overlay_traces = []
+for chem, color in pastel_colors.items():
+    label_col = chemical_column_map[chem]
+    if label_col in final_df.columns:
+        chem_df = final_df[final_df[label_col] == "High"].copy()
+        chem_df["Exposure"] = chem
+        trace = px.choropleth_mapbox(
+            chem_df,
+            geojson=geojson_data,
+            locations="FIPS",
+            color_discrete_sequence=[color],
+            mapbox_style="carto-positron",
+            zoom=3,
+            center={"lat": 37.8, "lon": -96},
+            opacity=0.7,
+            hover_name="Exposure"
+        ).update_traces(
             marker_line_width=1,
-            marker_line_color="white",
-            name=chem_options[chem]
-        )
+            marker_line_color=color,
+            name=chem,
+            showlegend=True
+        ).data[0]
+        overlay_traces.append(trace)
 
-    fig.update_layout(margin={"r":0,"t":40,"l":0,"b":0}, legend_title="High Exposure Chemical")
+# STEP 5: Base choropleth for Ewing Sarcoma incidence
+fig = px.choropleth_mapbox(
+    final_df,
+    geojson=geojson_data,
+    locations="FIPS",
+    color="Rate_per_1M",
+    color_continuous_scale="YlOrRd",
+    range_color=(0, final_df["Rate_per_1M"].max()),
+    mapbox_style="carto-positron",
+    zoom=3,
+    center={"lat": 37.8, "lon": -96},
+    opacity=0.5,
+    labels={"Rate_per_1M": "Ewing Rate per 1M"},
+    hover_name="FIPS"
+)
+
+# STEP 6: Add overlays
+for trace in overlay_traces:
+    fig.add_trace(trace)
+
+# STEP 7: Final layout tweaks
+fig.update_layout(
+    title="Ewing Sarcoma Incidence with Overlays of High Exposure to Statistically Significant Chemicals",
+    legend_title_text="High Exposure Chemical",
+    legend=dict(
+        yanchor="top", y=0.99,
+        xanchor="left", x=0.01,
+        bgcolor="white",
+        bordercolor="black",
+        borderwidth=0.5
+    ),
+    margin={"r":0,"t":40,"l":0,"b":0}
+)
     return fig
 
 # Run the app
