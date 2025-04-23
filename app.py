@@ -1,11 +1,17 @@
 from flask import Flask
 import os
+import pandas as pd
 
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "✅ Flask is working"
+    df = pd.DataFrame({
+        "col1": [1, 2, 3],
+        "col2": ["a", "b", "c"]
+    })
+    html_table = df.to_html(index=False)
+    return f"<h1>✅ Plotting Test</h1>{html_table}"
 
 @app.route("/ping")
 def ping():
