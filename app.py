@@ -6,39 +6,44 @@ import plotly.io as pio
 from flask import Flask
 import urllib.request
 
-# Create Flask app
 app = Flask(__name__)
 
-# Load final dataset
-final_df = pd.read_csv("final_df.csv")  # Ensure this file is present in your repo
-final_df["FIPS"] = final_df["FIPS"].astype(str).str.zfill(5)
+# Quick health check route
+@app.route("/ping")
+def ping():
+    return "pong"
 
-# ✅ Load GeoJSON directly from Plotly's GitHub
-with urllib.request.urlopen("https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json") as response:
-    geojson_data = json.load(response)
+# Main route for the interactive map
+@app.route("/")
+def index():
+    print("🔄 / route was accessed")
 
-# Pastel colors for chemicals
-pastel_colors = {
-    "Xylene (Mixed Isomers)": "#a6cee3",
-    "Ethylbenzene": "#fdbf6f",
-    "Toluene": "#b2df8a",
-    "Naphthalene": "#fb9a99",
-    "Nickel compounds": "#cab2d6",
-    "Benzo[g,h,i]perylene": "#ffff99"
-}
+    # Load data dynamically (prevents slow cold starts)
+    final_df = pd.read_csv("final_df.csv")
+    final_df["FIPS"] = final_df["FIPS"].astype(str).str.zfill(5)
 
-# Map chemical names to label column names in your dataset
-chemical_column_map = {
-    "Xylene (Mixed Isomers)": "xylene (mixed isomers)_label",
-    "Ethylbenzene": "ethylbenzene_label",
-    "Toluene": "toluene_label",
-    "Naphthalene": "naphthalene_label",
-    "Nickel compounds": "nickel compounds_label",
-    "Benzo[g,h,i]perylene": "benzo[g,h,i]perylene_label"
-}
+    with urllib.request.urlopen("https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json") as response:
+        geojson_data = json.load(response)
 
-# Build the plot
-def create_plot():
+    # Pastel colors and label map
+    pastel_colors = {
+        "Xylene (Mixed Isomers)": "#a6cee3",
+        "Ethylbenzene": "#fdbf6f",
+        "Toluene": "#b2df8a",
+        "Naphthalene": "#fb9a99",
+        "Nickel compounds": "#cab2d6",
+        "Benzo[g,h,i]perylene": "#ffff99"
+    }
+
+    chemical_column_map = {
+        "Xylene (Mixed Isomers)": "xylene (mixed isomers)_label",
+        "Ethylbenzene": "ethylbenzene_label",
+        "Toluene": "toluene_label",
+        "Naphthalene": "naphthalene_label",
+        "Nickel compounds": "nickel compounds_label",
+        "Benzo[g,h,i]perylene": "benzo[g,h,i]perylene_label"
+    }
+
     overlay_traces = []
     for chem, color in pastel_colors.items():
         label_col = chemical_column_map[chem]
@@ -63,7 +68,6 @@ def create_plot():
             ).data[0]
             overlay_traces.append(trace)
 
-    # Base incidence map
     fig = px.choropleth_mapbox(
         final_df,
         geojson=geojson_data,
@@ -97,13 +101,8 @@ def create_plot():
 
     return pio.to_html(fig, full_html=True)
 
-# Route to render the map
-@app.route("/")
-def index():
-    return create_plot()
-
 # Start the app
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))
-    print(f"✅ Flask app is starting on port {port}")
+    print(f"✅ Flask is starting on port {port}")
     app.run(host="0.0.0.0", port=port)
