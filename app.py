@@ -4,17 +4,20 @@ import pandas as pd
 import plotly.express as px
 import plotly.io as pio
 from flask import Flask
+import urllib.request
 
 # Create Flask app
 app = Flask(__name__)
 
-# Load data and prepare once (not on every request)
-with open("geojson-counties-fips.json") as f:
-    geojson_data = json.load(f)
-
-final_df = pd.read_csv("your_data.csv")  # <- make sure your data file is loaded properly
+# Load final dataset
+final_df = pd.read_csv("final_df.csv")  # Ensure this file is present in your repo
 final_df["FIPS"] = final_df["FIPS"].astype(str).str.zfill(5)
 
+# ✅ Load GeoJSON directly from Plotly's GitHub
+with urllib.request.urlopen("https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json") as response:
+    geojson_data = json.load(response)
+
+# Pastel colors for chemicals
 pastel_colors = {
     "Xylene (Mixed Isomers)": "#a6cee3",
     "Ethylbenzene": "#fdbf6f",
@@ -24,6 +27,7 @@ pastel_colors = {
     "Benzo[g,h,i]perylene": "#ffff99"
 }
 
+# Map chemical names to label column names in your dataset
 chemical_column_map = {
     "Xylene (Mixed Isomers)": "xylene (mixed isomers)_label",
     "Ethylbenzene": "ethylbenzene_label",
@@ -33,6 +37,7 @@ chemical_column_map = {
     "Benzo[g,h,i]perylene": "benzo[g,h,i]perylene_label"
 }
 
+# Build the plot
 def create_plot():
     overlay_traces = []
     for chem, color in pastel_colors.items():
@@ -58,6 +63,7 @@ def create_plot():
             ).data[0]
             overlay_traces.append(trace)
 
+    # Base incidence map
     fig = px.choropleth_mapbox(
         final_df,
         geojson=geojson_data,
@@ -91,12 +97,12 @@ def create_plot():
 
     return pio.to_html(fig, full_html=True)
 
-# Route to serve the map
+# Route to render the map
 @app.route("/")
-def show_map():
+def index():
     return create_plot()
 
-# App entry point
+# Start the app
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))
     app.run(host="0.0.0.0", port=port)
