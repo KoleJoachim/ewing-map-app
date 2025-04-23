@@ -87,7 +87,7 @@ fig.update_layout(
     ),
     margin={"r":0,"t":40,"l":0,"b":0}
 )
-    return fig
+return fig
 
 # Run the app
 
