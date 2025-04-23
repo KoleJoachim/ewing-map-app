@@ -1,25 +1,29 @@
-import plotly.express as px
-import pandas as pd
+import os
 import json
+import pandas as pd
+import plotly.express as px
+import plotly.io as pio
+from flask import Flask
 
-# STEP 1: Load GeoJSON
+# Create Flask app
+app = Flask(__name__)
+
+# Load data and prepare once (not on every request)
 with open("geojson-counties-fips.json") as f:
     geojson_data = json.load(f)
 
-# STEP 2: Format FIPS codes
+final_df = pd.read_csv("your_data.csv")  # <- make sure your data file is loaded properly
 final_df["FIPS"] = final_df["FIPS"].astype(str).str.zfill(5)
 
-# STEP 3: Define pastel colors and correct column name mapping
 pastel_colors = {
-    "Xylene (Mixed Isomers)": "#a6cee3",     # pastel blue
-    "Ethylbenzene": "#fdbf6f",               # pastel orange
-    "Toluene": "#b2df8a",                    # pastel green
-    "Naphthalene": "#fb9a99",                # pastel red
-    "Nickel compounds": "#cab2d6",           # pastel purple
-    "Benzo[g,h,i]perylene": "#ffff99"        # pastel yellow
+    "Xylene (Mixed Isomers)": "#a6cee3",
+    "Ethylbenzene": "#fdbf6f",
+    "Toluene": "#b2df8a",
+    "Naphthalene": "#fb9a99",
+    "Nickel compounds": "#cab2d6",
+    "Benzo[g,h,i]perylene": "#ffff99"
 }
 
-# Explicit column mapping for label fields
 chemical_column_map = {
     "Xylene (Mixed Isomers)": "xylene (mixed isomers)_label",
     "Ethylbenzene": "ethylbenzene_label",
@@ -29,68 +33,70 @@ chemical_column_map = {
     "Benzo[g,h,i]perylene": "benzo[g,h,i]perylene_label"
 }
 
-# STEP 4: Generate overlay traces for each chemical
-overlay_traces = []
-for chem, color in pastel_colors.items():
-    label_col = chemical_column_map[chem]
-    if label_col in final_df.columns:
-        chem_df = final_df[final_df[label_col] == "High"].copy()
-        chem_df["Exposure"] = chem
-        trace = px.choropleth_mapbox(
-            chem_df,
-            geojson=geojson_data,
-            locations="FIPS",
-            color_discrete_sequence=[color],
-            mapbox_style="carto-positron",
-            zoom=3,
-            center={"lat": 37.8, "lon": -96},
-            opacity=0.7,
-            hover_name="Exposure"
-        ).update_traces(
-            marker_line_width=1,
-            marker_line_color=color,
-            name=chem,
-            showlegend=True
-        ).data[0]
-        overlay_traces.append(trace)
+def create_plot():
+    overlay_traces = []
+    for chem, color in pastel_colors.items():
+        label_col = chemical_column_map[chem]
+        if label_col in final_df.columns:
+            chem_df = final_df[final_df[label_col] == "High"].copy()
+            chem_df["Exposure"] = chem
+            trace = px.choropleth_mapbox(
+                chem_df,
+                geojson=geojson_data,
+                locations="FIPS",
+                color_discrete_sequence=[color],
+                mapbox_style="carto-positron",
+                zoom=3,
+                center={"lat": 37.8, "lon": -96},
+                opacity=0.7,
+                hover_name="Exposure"
+            ).update_traces(
+                marker_line_width=1,
+                marker_line_color=color,
+                name=chem,
+                showlegend=True
+            ).data[0]
+            overlay_traces.append(trace)
 
-# STEP 5: Base choropleth for Ewing Sarcoma incidence
-fig = px.choropleth_mapbox(
-    final_df,
-    geojson=geojson_data,
-    locations="FIPS",
-    color="Rate_per_1M",
-    color_continuous_scale="YlOrRd",
-    range_color=(0, final_df["Rate_per_1M"].max()),
-    mapbox_style="carto-positron",
-    zoom=3,
-    center={"lat": 37.8, "lon": -96},
-    opacity=0.5,
-    labels={"Rate_per_1M": "Ewing Rate per 1M"},
-    hover_name="FIPS"
-)
+    fig = px.choropleth_mapbox(
+        final_df,
+        geojson=geojson_data,
+        locations="FIPS",
+        color="Rate_per_1M",
+        color_continuous_scale="YlOrRd",
+        range_color=(0, final_df["Rate_per_1M"].max()),
+        mapbox_style="carto-positron",
+        zoom=3,
+        center={"lat": 37.8, "lon": -96},
+        opacity=0.5,
+        labels={"Rate_per_1M": "Ewing Rate per 1M"},
+        hover_name="FIPS"
+    )
 
-# STEP 6: Add overlays
-for trace in overlay_traces:
-    fig.add_trace(trace)
+    for trace in overlay_traces:
+        fig.add_trace(trace)
 
-# STEP 7: Final layout tweaks
-fig.update_layout(
-    title="Ewing Sarcoma Incidence with Overlays of High Exposure to Statistically Significant Chemicals",
-    legend_title_text="High Exposure Chemical",
-    legend=dict(
-        yanchor="top", y=0.99,
-        xanchor="left", x=0.01,
-        bgcolor="white",
-        bordercolor="black",
-        borderwidth=0.5
-    ),
-    margin={"r":0,"t":40,"l":0,"b":0}
-)
-return fig
+    fig.update_layout(
+        title="Ewing Sarcoma Incidence with Overlays of High Exposure to Statistically Significant Chemicals",
+        legend_title_text="High Exposure Chemical",
+        legend=dict(
+            yanchor="top", y=0.99,
+            xanchor="left", x=0.01,
+            bgcolor="white",
+            bordercolor="black",
+            borderwidth=0.5
+        ),
+        margin={"r":0,"t":40,"l":0,"b":0}
+    )
 
-# Run the app
+    return pio.to_html(fig, full_html=True)
 
+# Route to serve the map
+@app.route("/")
+def show_map():
+    return create_plot()
+
+# App entry point
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port)
