@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: ewing-map-app
-    env: python
-    startCommand: python app.py
-    plan: free
-    envVars:
-      - key: PORT
-        value: 8050
