@@ -1,31 +1,27 @@
-import os
-import json
+from flask import Flask
 import pandas as pd
 import plotly.express as px
 import plotly.io as pio
-from flask import Flask
+import json
 import urllib.request
+import os
 
 app = Flask(__name__)
 
-# Quick health check route
 @app.route("/ping")
 def ping():
     return "pong"
 
-# Main route for the interactive map
 @app.route("/")
 def index():
     print("🔄 / route was accessed")
 
-    # Load data dynamically (prevents slow cold starts)
     final_df = pd.read_csv("final_df.csv")
     final_df["FIPS"] = final_df["FIPS"].astype(str).str.zfill(5)
 
     with urllib.request.urlopen("https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json") as response:
         geojson_data = json.load(response)
 
-    # Pastel colors and label map
     pastel_colors = {
         "Xylene (Mixed Isomers)": "#a6cee3",
         "Ethylbenzene": "#fdbf6f",
@@ -101,7 +97,6 @@ def index():
 
     return pio.to_html(fig, full_html=True)
 
-# Start the app
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))
     print(f"✅ Flask is starting on port {port}")
