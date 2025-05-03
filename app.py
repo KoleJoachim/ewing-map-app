@@ -7,11 +7,27 @@ import plotly.io as pio
 from flask import Flask, request
 from urllib.parse import unquote
 
-if not os.path.exists("cleaned_final_data.csv"):
-    raise FileNotFoundError(
-        "Critical: cleaned_final_data.csv missing. "
-        "Check build process and file names."
+def load_optimized_data():
+    """Load data with explicit file check"""
+    if not os.path.exists("cleaned_final_df.csv"):
+        raise FileNotFoundError(
+            "Missing cleaned_final_df.csv - check build process"
+        )
+    
+    df = pd.read_csv(
+        "cleaned_final_df.csv",
+        dtype={"FIPS": "string"},
+        na_values=['', 'nan', 'NaN']
     )
+    return df
+
+# Load data globally
+try:
+    FINAL_DF = load_optimized_data()
+except FileNotFoundError as e:
+    print(f"CRITICAL ERROR: {str(e)}")
+    raise
+    
 PORT = int(os.environ.get("PORT", 8050)) 
 app = Flask(__name__)
 
