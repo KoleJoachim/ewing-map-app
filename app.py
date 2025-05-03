@@ -23,7 +23,7 @@ def load_and_optimize_data():
     try:
         dtype = {"FIPS": "string"}
         df = pd.read_csv(
-            "cleaned_final_df.csv",
+            "cleaned_final_proper.csv",
             dtype=dtype,
             usecols=lambda col: col != "Unnamed: 0"  # Skip index column if present
         )
@@ -36,7 +36,7 @@ def load_and_optimize_data():
         num_cols = ["Count", "Population", "Rate_per_1M"]
         df[num_cols] = df[num_cols].apply(pd.to_numeric, downcast="unsigned")
         
-        # Clean FIPS codes
+        #  FIPS codes
         df["FIPS"] = df["FIPS"].str.zfill(5).fillna("00000")
         
         return df
