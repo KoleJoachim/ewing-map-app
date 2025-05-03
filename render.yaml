@@ -2,7 +2,6 @@ services:
   - type: web
     name: Chemical Map
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && python clean_data.py
     startCommand: gunicorn app:app --worker-class gevent --bind :${PORT} --timeout 300 --workers 1
     healthCheckPath: /health
-    healthCheckTimeout: 120
