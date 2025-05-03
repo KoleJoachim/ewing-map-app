@@ -7,6 +7,11 @@ import plotly.io as pio
 from flask import Flask, request
 from urllib.parse import unquote
 
+if not os.path.exists("cleaned_final_data.csv"):
+    raise FileNotFoundError(
+        "Critical: cleaned_final_data.csv missing. "
+        "Check build process and file names."
+    )
 PORT = int(os.environ.get("PORT", 8050)) 
 app = Flask(__name__)
 
@@ -18,12 +23,9 @@ with urllib.request.urlopen(
     GEOJSON = json.load(response)
 
 def load_optimized_data():
-    """Load data with proper NaN handling"""
-    df = pd.read_csv(
-        "cleaned_final_proper.csv",
-        dtype={"FIPS": "string"},
-        na_values=['', 'nan', 'NaN']
-    )
+    df = pd.read_csv("cleaned_final_data.csv",  # Match exact name
+                   dtype={"FIPS": "string"},
+                   na_values=['', 'nan', 'NaN'])
     
     # Clean FIPS (fill only FIPS NaNs)
     df["FIPS"] = df["FIPS"].fillna("00000").str.zfill(5)
