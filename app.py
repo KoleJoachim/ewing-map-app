@@ -7,6 +7,7 @@ import plotly.io as pio
 from flask import Flask, request
 from urllib.parse import unquote
 
+PORT = int(os.environ.get("PORT", 8050)) 
 app = Flask(__name__)
 
 # Cache GeoJSON
@@ -113,5 +114,4 @@ def index():
         """, 500
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8050))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=PORT)
