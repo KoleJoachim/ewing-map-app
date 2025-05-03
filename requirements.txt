@@ -1,5 +1,4 @@
-dash
-pandas
-plotly
-geopandas
-flask
+Flask==2.0.3
+pandas==1.3.5
+plotly==5.10.0
+gunicorn==20.1.0
