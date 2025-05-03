@@ -1,5 +1,6 @@
 Flask==3.0.2
 pandas==2.2.2
 plotly==5.20.0
+numpy==1.26.4  # Pinned stable version
 gunicorn==21.2.0
 gevent==23.9.1
