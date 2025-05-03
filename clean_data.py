@@ -9,9 +9,9 @@ def clean_data(input_file, output_file):
         df[col] = df[col].replace({'High': 1, 'Low': 0})
         df[col] = pd.to_numeric(df[col], errors='coerce')
     
-    df['FIPS'] = df['FIPS'].str.zfill(5).replace('nan', pd.NA)
+    df['FIPS'] = df['FIPS'].str.zfill(5).fillna("00000")
     df.to_csv(output_file, index=False)
+    print(f"✅ Successfully created {output_file}")
 
-if __name__ == "__main__":  # Proper execution guard
-    clean_data('final_df.csv', 'cleaned_final_proper.csv')
-    df.to_csv("cleaned_final_data.csv", index=False)
+if __name__ == "__main__":
+    clean_data('final_df.csv', 'cleaned_final_data.csv')  # Fixed output name
