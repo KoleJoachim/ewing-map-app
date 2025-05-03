@@ -31,8 +31,8 @@ def index():
     with urllib.request.urlopen("https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json") as response:
         geojson_data = json.load(response)
 
-    # Create choropleth
-     fig = px.choropleth(
+    # Create choropleth (FIXED INDENTATION)
+    fig = px.choropleth(
         final_df,
         geojson=geojson_data,
         locations="FIPS",
