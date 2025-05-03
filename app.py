@@ -15,18 +15,22 @@ def load_optimized_data():
         )
     
     df = pd.read_csv(
-        "cleaned_final_df.csv",
+        "cleaned_final_df.csv",  # Correct filename
         dtype={"FIPS": "string"},
         na_values=['', 'nan', 'NaN']
     )
+    
+    # Clean FIPS (fill only FIPS NaNs)
+    df["FIPS"] = df["FIPS"].fillna("00000").str.zfill(5)
+    
     return df
 
-# Load data globally
+# Load data once at startup
 try:
     FINAL_DF = load_optimized_data()
 except FileNotFoundError as e:
     print(f"CRITICAL ERROR: {str(e)}")
-    raise
+    raise  # Fail fast if data missing
     
 PORT = int(os.environ.get("PORT", 8050)) 
 app = Flask(__name__)
@@ -37,19 +41,6 @@ with urllib.request.urlopen(
     timeout=10
 ) as response:
     GEOJSON = json.load(response)
-
-def load_optimized_data():
-    df = pd.read_csv("cleaned_final_data.csv",  # Match exact name
-                   dtype={"FIPS": "string"},
-                   na_values=['', 'nan', 'NaN'])
-    
-    # Clean FIPS (fill only FIPS NaNs)
-    df["FIPS"] = df["FIPS"].fillna("00000").str.zfill(5)
-    
-    return df
-
-# Load data once at startup
-FINAL_DF = load_optimized_data()
 
 def get_chemical_columns():
     """Get column lists with proper handling"""
