@@ -5,77 +5,61 @@ import pandas as pd
 import plotly.express as px
 import plotly.io as pio
 from flask import Flask, request
-from functools import lru_cache
+from urllib.parse import unquote
 
-PORT = int(os.environ.get("PORT", 8050))  # Explicit port declaration
 app = Flask(__name__)
 
-# Cache GeoJSON at startup
+# Cache GeoJSON
 with urllib.request.urlopen(
     "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json",
     timeout=10
 ) as response:
     GEOJSON = json.load(response)
 
-@lru_cache(maxsize=None)
-def load_and_optimize_data():
-    """Load and optimize data once with memory-efficient types"""
-    try:
-        dtype = {"FIPS": "string"}
-        df = pd.read_csv(
-            "cleaned_final_proper.csv",
-            dtype=dtype,
-            usecols=lambda col: col != "Unnamed: 0"  # Skip index column if present
-        )
-        
-        # Convert to categorical where possible
-        categorical_cols = [col for col in df.columns if col.endswith("_label")]
-        df[categorical_cols] = df[categorical_cols].astype("category")
-        
-        # Optimize numerical columns
-        num_cols = ["Count", "Population", "Rate_per_1M"]
-        df[num_cols] = df[num_cols].apply(pd.to_numeric, downcast="unsigned")
-        
-        #  FIPS codes
-        df["FIPS"] = df["FIPS"].str.zfill(5).fillna("00000")
-        
-        return df
-    except Exception as e:
-        app.logger.error(f"Data loading failed: {str(e)}")
-        raise
+def load_optimized_data():
+    """Load data with proper NaN handling"""
+    df = pd.read_csv(
+        "cleaned_final_proper.csv",
+        dtype={"FIPS": "string"},
+        na_values=['', 'nan', 'NaN']
+    )
+    
+    # Clean FIPS (fill only FIPS NaNs)
+    df["FIPS"] = df["FIPS"].fillna("00000").str.zfill(5)
+    
+    return df
 
 # Load data once at startup
-try:
-    FINAL_DF = load_and_optimize_data()
-except Exception as e:
-    app.logger.critical(f"Critical startup failure: {str(e)}")
-    raise
+FINAL_DF = load_optimized_data()
 
 def get_chemical_columns():
-    """Get column lists from cached data"""
+    """Get column lists with proper handling"""
     numerical = ["Rate_per_1M", "Count", "Population"]
     categorical = [col for col in FINAL_DF.columns 
-                 if col.endswith("_label") and col != "FIPS"]
+                 if '_label' in col and FINAL_DF[col].isin([0, 1]).any()]
     return numerical, categorical
 
 @app.route("/ping")
 def health_check():
-    """Lightweight health check"""
     return "pong", 200
 
 @app.route("/")
 def index():
     try:
         numerical_cols, categorical_cols = get_chemical_columns()
-        selected_chemical = request.args.get("chemical", "Rate_per_1M")
-
+        selected_chemical = unquote(request.args.get("chemical", "Rate_per_1M"))
+        
         # Validate selection
         if selected_chemical not in numerical_cols + categorical_cols:
             selected_chemical = "Rate_per_1M"
 
-        # Create visualization with sampled data
-        viz_df = FINAL_DF.sample(n=1000) if len(FINAL_DF) > 5000 else FINAL_DF
-        
+        # Filter data for visualization
+        viz_df = FINAL_DF.copy()
+        if selected_chemical in categorical_cols:
+            # Remove rows without valid data for selected chemical
+            viz_df = viz_df.dropna(subset=[selected_chemical])
+
+        # Create visualization
         if selected_chemical in numerical_cols:
             fig = px.choropleth(
                 viz_df,
@@ -90,7 +74,7 @@ def index():
                 viz_df,
                 geojson=GEOJSON,
                 locations="FIPS",
-                color=selected_chemical.astype("category"),
+                color=selected_chemical.astype('category'),
                 color_discrete_map={0: "green", 1: "red"},
                 category_orders={selected_chemical: [0, 1]},
             )
@@ -101,9 +85,10 @@ def index():
             height=700
         )
 
+        # Generate dropdown options with cleaned names
         options = "\n".join(
             f'<option value="{col}" {"selected" if col==selected_chemical else ""}>'
-            f'{col.replace("_label", "").title()}</option>'
+            f'{col.replace("_label", "").replace("[", "(").replace("]", ")").replace("_", " ").title()}</option>'
             for col in numerical_cols + categorical_cols
         )
 
@@ -121,17 +106,12 @@ def index():
         """
 
     except Exception as e:
-        app.logger.error(f"Route error: {str(e)}")
         return f"""
-        <h1>Application Error</h1>
+        <h1>Error</h1>
         <p>{str(e)}</p>
-        <p>Common fixes:</p>
-        <ul>
-            <li>Try refreshing the page</li>
-            <li>Select a different chemical parameter</li>
-            <li>Contact support if this persists</li>
-        </ul>
+        <p>Try selecting a different chemical or refreshing the page.</p>
         """, 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=PORT)
+    port = int(os.environ.get("PORT", 8050))
+    app.run(host="0.0.0.0", port=port)
