@@ -32,7 +32,7 @@ def index():
         geojson_data = json.load(response)
 
     # Create choropleth
-    fig = px.choropleth(
+     fig = px.choropleth(
         final_df,
         geojson=geojson_data,
         locations="FIPS",
@@ -42,11 +42,13 @@ def index():
         range_color=(0, final_df[selected_chemical].max()),
         hover_name="FIPS",
         labels={selected_chemical: f"{selected_chemical} per 1M"},
-        center={"lat": 37.8, "lon": -96},
-        zoom=3,
     )
 
     fig.update_layout(
+        geo=dict(
+            center={"lat": 37.8, "lon": -96},
+            projection_scale=3
+        ),
         title=f"{selected_chemical} Incidence by County",
         margin={"r":0,"t":40,"l":0,"b":0},
         height=700
