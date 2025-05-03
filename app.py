@@ -34,6 +34,7 @@ except FileNotFoundError as e:
     
 PORT = int(os.environ.get("PORT", 8050)) 
 app = Flask(__name__)
+app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', 'localhost:{}'.format(PORT))
 
 # Cache GeoJSON
 with urllib.request.urlopen(
@@ -123,4 +124,5 @@ def index():
         """, 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=PORT)
+    port = int(os.environ.get("PORT", 8050))
+    app.run(host='0.0.0.0', port=port, debug=os.environ.get('DEBUG', 'False') == 'True')
